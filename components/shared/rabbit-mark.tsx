@@ -1,7 +1,8 @@
 "use client"
 
-// The RabbitMQ rabbit as one blocky orange mesh: breathes and twitches an ear while idle, hops on click.
-import { useEffect, useRef } from "react"
+// The RabbitMQ rabbit as one blocky orange mesh: breathes and twitches an ear while idle, hops on click,
+// and can be told to hop or spin from outside through its ref.
+import { useEffect, useImperativeHandle, useRef, type Ref } from "react"
 import * as THREE from "three"
 
 type Block = [number, number, number, number, number, number]
@@ -120,19 +121,19 @@ function hopPose(t: number) {
   // 1. crouch before the jump, ears tipping forward
   if (t < HOP.crouch) {
     const k = Math.sin(((t / HOP.crouch) * Math.PI) / 2)
-    return { y: 0, sy: 1 - 0.18 * k, ear: -0.15 * k }
+    return { y: 0, sy: 1 - 0.18 * k, ear: -0.15 * k, air: 0 }
   }
   // 2. in the air: stretched while fast, ears trailing back on the way up and lifting on the way down
   t -= HOP.crouch
   if (t < HOP.air) {
     const k = t / HOP.air
-    return { y: HOP.height * 4 * k * (1 - k), sy: 1 + 0.14 * Math.abs(1 - 2 * k), ear: 0.3 * (1 - 2 * k) }
+    return { y: HOP.height * 4 * k * (1 - k), sy: 1 + 0.14 * Math.abs(1 - 2 * k), ear: 0.3 * (1 - 2 * k), air: k }
   }
   // 3. landing: squash, wobble and settle, ears flopping forward
   t -= HOP.air
   if (t < HOP.land) {
     const k = t / HOP.land, fade = (1 - k) ** 2
-    return { y: 0, sy: 1 - 0.22 * fade * Math.cos(k * Math.PI * 2.5), ear: -0.3 * fade * Math.cos(k * Math.PI * 3) }
+    return { y: 0, sy: 1 - 0.22 * fade * Math.cos(k * Math.PI * 2.5), ear: -0.3 * fade * Math.cos(k * Math.PI * 3), air: 1 }
   }
   return null
 }
@@ -149,8 +150,20 @@ function ring(kicks: Kick[], t: number, key: "x" | "z") {
   return sum
 }
 
-export function RabbitMark({ className }: { className?: string }) {
+export type RabbitMarkHandle = {
+  /** One hop, unless one is already under way */
+  hop: () => void
+  /** Spin jumps one after another until the returned stop is called; stop's promise settles once the last one has landed */
+  spin: () => () => Promise<void>
+}
+
+export function RabbitMark({ className, ref: handle }: { className?: string; ref?: Ref<RabbitMarkHandle> }) {
   const ref = useRef<HTMLCanvasElement>(null)
+  const controls = useRef<RabbitMarkHandle>(null)
+  useImperativeHandle(handle, () => ({
+    hop: () => controls.current?.hop(),
+    spin: () => controls.current?.spin() ?? (() => Promise.resolve()),
+  }), [])
 
   useEffect(() => {
     const canvas = ref.current
@@ -189,12 +202,31 @@ export function RabbitMark({ className }: { className?: string }) {
     const rabbit = buildRabbit(material)
     scene.add(rabbit.mesh)
 
-    // 4. one frame: breathe and twitch an ear while idle, hop when clicked, pose the bones
+    // 4. hops, and the playground's spin jump: a hop with a full turn in the air.
+    //    While a spin is wanted, each spin jump lands straight into the next one.
     const idle = !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    let jump: { t0: number; spin: boolean } | null = null
+    let wantSpin = false, spinId = 0
+    const landed: (() => void)[] = []
+    let now = 0
+    const startHop = () => {
+      if (!jump) jump = { t0: now, spin: false }
+    }
+    const spin = () => {
+      if (!idle) return () => Promise.resolve()
+      const id = ++spinId
+      wantSpin = true
+      // a hop already under way finishes first, then the spin jumps start
+      if (!jump) jump = { t0: now, spin: true }
+      return () => {
+        if (id === spinId) wantSpin = false
+        return jump?.spin ? new Promise<void>((done) => landed.push(done)) : Promise.resolve()
+      }
+    }
+
+    // 5. one frame: breathe and twitch an ear while idle, hop or spin jump when asked, pose the bones
     const kicks: Kick[][] = [[], []]
     let nextTwitch = rand(1.5, 4)
-    let hopStart: number | null = null
-    let now = 0
     const pose = (t: number) => {
       now = t
       if (idle && t >= nextTwitch) {
@@ -202,11 +234,17 @@ export function RabbitMark({ className }: { className?: string }) {
         kicks[i].push({ t0: t, x: (i === 0 ? 1 : -1) * 0.12, z: -0.25 })
         nextTwitch = t + rand(2, 5)
       }
-      const hop = hopStart === null ? null : hopPose(t - hopStart)
-      if (!hop) hopStart = null
+      let hop = jump && hopPose(t - jump.t0)
+      if (jump && !hop) {
+        // landed: jump again while a spin is wanted, otherwise settle
+        jump = wantSpin ? { t0: t, spin: true } : null
+        hop = jump && hopPose(0)
+        if (!jump) landed.splice(0).forEach((done) => done())
+      }
       const sy = (hop ? hop.sy : 1) * (idle ? 1 + 0.012 * Math.sin((t * Math.PI * 2) / 3.4) : 1)
       const sxz = 1 / Math.sqrt(sy)
       rabbit.mesh.position.y = hop ? hop.y : 0
+      rabbit.mesh.rotation.y = hop && jump?.spin ? Math.PI * 2 * smooth(0, 1, hop.air) : 0
       rabbit.body.scale.set(sxz, sy, sxz)
       rabbit.ears.forEach((ear, i) => {
         while (kicks[i].length && t - kicks[i][0].t0 > 1.5) kicks[i].shift()
@@ -217,17 +255,18 @@ export function RabbitMark({ className }: { className?: string }) {
       renderer.render(scene, camera)
     }
 
-    // 5. a click on the rabbit makes it hop
+    // 6. a click on the rabbit makes it hop
     const raycaster = new THREE.Raycaster()
     const onClick = (e: MouseEvent) => {
       const r = canvas.getBoundingClientRect()
       const at = new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1)
       raycaster.setFromCamera(at, camera)
-      if (hopStart === null && raycaster.intersectObject(rabbit.mesh, false).length) hopStart = now
+      if (raycaster.intersectObject(rabbit.mesh, false).length) startHop()
     }
     canvas.addEventListener("click", onClick)
+    controls.current = { hop: startHop, spin }
 
-    // 6. size the drawing to the canvas as laid out, whenever its box changes
+    // 7. size the drawing to the canvas as laid out, whenever its box changes
     const resize = new ResizeObserver(() => {
       if (!canvas.clientWidth || !canvas.clientHeight) return
       renderer.setSize(canvas.clientWidth, canvas.clientHeight, false)
@@ -236,10 +275,12 @@ export function RabbitMark({ className }: { className?: string }) {
     })
     resize.observe(canvas)
 
-    // 7. draw every frame, so hops show
+    // 8. draw every frame, so hops and spins show
     renderer.setAnimationLoop((ms) => pose(ms / 1000))
 
     return () => {
+      controls.current = null
+      landed.splice(0).forEach((done) => done())
       canvas.removeEventListener("click", onClick)
       resize.disconnect()
       renderer.setAnimationLoop(null)

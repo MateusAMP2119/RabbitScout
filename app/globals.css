@@ -216,3 +216,17 @@
 .u-wrap {
   background: transparent !important;
 }
+
+/* Logging in: the login screen and the page it opens cross-fade */
+::view-transition-old(.login-fade),
+::view-transition-new(.login-fade) {
+  animation-duration: 300ms;
+  animation-timing-function: ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(.login-fade),
+  ::view-transition-new(.login-fade) {
+    animation-duration: 0s;
+  }
+}

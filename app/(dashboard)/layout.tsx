@@ -19,31 +19,34 @@ export default function DashboardLayout({
 
   return (
     <TooltipProvider delayDuration={300}>
-      <div className="min-h-screen">
-        <Sidebar />
+      {/* Fades in over the login screen after logging in (see globals.css) */}
+      <React.ViewTransition enter={{ login: "login-fade", default: "none" }} default="none">
+        <div className="min-h-screen">
+          <Sidebar />
 
-        {/* Mobile navigation drawer */}
-        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-          <SheetContent side="left" className="w-[240px] bg-sidebar p-0 sm:max-w-[240px]">
-            <SheetTitle className="sr-only">Navigation</SheetTitle>
-            <div className="flex h-full flex-col">
-              <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
-            </div>
-          </SheetContent>
-        </Sheet>
+          {/* Mobile navigation drawer */}
+          <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+            <SheetContent side="left" className="w-[240px] bg-sidebar p-0 sm:max-w-[240px]">
+              <SheetTitle className="sr-only">Navigation</SheetTitle>
+              <div className="flex h-full flex-col">
+                <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
+              </div>
+            </SheetContent>
+          </Sheet>
 
-        <div
-          className={cn(
-            "transition-[margin-left] duration-200 ease-in-out",
-            sidebarCollapsed ? "lg:ml-16" : "lg:ml-[220px]",
-          )}
-        >
-          <Header onMobileMenu={() => setMobileNavOpen(true)} />
-          <main className="p-4 lg:p-6">
-            <ErrorBoundary>{children}</ErrorBoundary>
-          </main>
+          <div
+            className={cn(
+              "transition-[margin-left] duration-200 ease-in-out",
+              sidebarCollapsed ? "lg:ml-16" : "lg:ml-[220px]",
+            )}
+          >
+            <Header onMobileMenu={() => setMobileNavOpen(true)} />
+            <main className="p-4 lg:p-6">
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </main>
+          </div>
         </div>
-      </div>
+      </React.ViewTransition>
     </TooltipProvider>
   )
 }
