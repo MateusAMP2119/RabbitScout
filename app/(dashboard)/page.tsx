@@ -140,13 +140,11 @@ export default function OverviewPage() {
             title="Queues"
             value={ov.object_totals?.queues ?? 0}
             icon={Rows3}
-            background={spark("queues")}
           />
           <StatCard
             title="Connections"
             value={ov.object_totals?.connections ?? 0}
             icon={Network}
-            background={spark("connections")}
           />
 
           {/* ── Cluster details ── */}
