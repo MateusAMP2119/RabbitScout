@@ -12,8 +12,6 @@ const POINTS = 120
 export const HISTORY_COLUMNS = [
   'messages',
   'mem_used',
-  'queues',
-  'connections',
   'disk_free',
   'fd_used',
   'proc_used',

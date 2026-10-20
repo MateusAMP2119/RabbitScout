@@ -17,8 +17,6 @@ const OVERVIEW_COLUMNS = [
   'queue_totals.messages_unacknowledged',
   'message_stats.publish',
   'message_stats.deliver_get',
-  'object_totals.queues',
-  'object_totals.connections',
 ].join(',')
 
 const NODE_COLUMNS = 'name,mem_used,disk_free,fd_used,proc_used'
@@ -34,9 +32,7 @@ const SCHEMA = `
     mem_used    INTEGER,
     disk_free   INTEGER,
     fd_used     INTEGER,
-    proc_used   INTEGER,
-    queues      INTEGER,
-    connections INTEGER
+    proc_used   INTEGER
   ) STRICT
 `
 
@@ -68,8 +64,6 @@ async function record(auth: string, insert: StatementSync, prune: StatementSync,
     node?.disk_free ?? null,
     node?.fd_used ?? null,
     node?.proc_used ?? null,
-    ov.object_totals?.queues ?? null,
-    ov.object_totals?.connections ?? null,
   )
   prune.run(ts - retentionSec)
 }
@@ -99,7 +93,9 @@ export async function startCollector() {
   // WAL lets the dashboard's reads run alongside these writes
   db.exec('PRAGMA journal_mode = WAL')
   db.exec(SCHEMA)
-  const insert = db.prepare('INSERT OR REPLACE INTO samples VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
+  const insert = db.prepare(
+    'INSERT OR REPLACE INTO samples (ts, messages, ready, unacked, publish, deliver_get, mem_used, disk_free, fd_used, proc_used) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+  )
   const prune = db.prepare('DELETE FROM samples WHERE ts < ?')
   console.log(`[metrics] recording every ${METRICS_INTERVAL_SECONDS}s into ${METRICS_DB}`)
 
