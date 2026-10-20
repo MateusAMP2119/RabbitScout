@@ -3,7 +3,7 @@
 import { useState } from "react"
 import type { Overview } from "@/lib/rabbitmq/types"
 
-const WINDOW_SEC = 120 // rolling live window
+export const WINDOW_SEC = 120 // rolling live window
 
 export interface LiveSeries {
   timestamps: number[]

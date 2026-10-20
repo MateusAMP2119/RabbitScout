@@ -31,6 +31,10 @@ yarn-error.log*
 # env files
 .env
 !.env.example
+.env*.local
+
+# local metrics recording (METRICS_DB)
+/.data/
 
 # vercel
 .vercel

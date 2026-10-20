@@ -96,6 +96,8 @@ export async function startCollector() {
   const retentionSec = Number(METRICS_RETENTION_DAYS) * 86400
 
   const db = new DatabaseSync(METRICS_DB)
+  // WAL lets the dashboard's reads run alongside these writes
+  db.exec('PRAGMA journal_mode = WAL')
   db.exec(SCHEMA)
   const insert = db.prepare('INSERT OR REPLACE INTO samples VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)')
   const prune = db.prepare('DELETE FROM samples WHERE ts < ?')

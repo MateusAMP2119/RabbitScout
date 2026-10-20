@@ -17,6 +17,7 @@ export const TIME_RANGES = [
 
 export type TimeRangeKey = (typeof TIME_RANGES)[number]["key"]
 
+// Flush cells filling a 48px toolbar row, each closed off by a hairline
 export function TimeRangeSelect({
   value,
   onChange,
@@ -25,16 +26,16 @@ export function TimeRangeSelect({
   onChange: (key: TimeRangeKey) => void
 }) {
   return (
-    <div className="inline-flex items-center gap-0.5 rounded-lg border bg-secondary/50 p-0.5">
+    <div className="flex divide-x border-r">
       {TIME_RANGES.map((r) => (
         <button
           key={r.key}
           onClick={() => onChange(r.key)}
           className={cn(
-            "rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors duration-(--duration-fast)",
+            "min-w-14 px-4 text-xs font-medium transition-colors duration-(--duration-fast)",
             value === r.key
-              ? "bg-background text-foreground shadow-xs"
-              : "text-muted-foreground hover:text-foreground",
+              ? "bg-accent text-foreground"
+              : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
           )}
         >
           {r.label}

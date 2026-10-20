@@ -1,6 +1,4 @@
-import { Suspense } from "react"
 import { QueueTable } from "@/components/queues/queue-table"
-import { Skeleton } from "@/components/ui/skeleton"
 
 export const dynamic = "force-dynamic"
 
@@ -13,10 +11,7 @@ export default function QueuesPage() {
           Create, inspect, and manage your RabbitMQ queues
         </p>
       </div>
-      {/* Suspense boundary required: QueueTable reads useSearchParams */}
-      <Suspense fallback={<Skeleton className="h-[400px] w-full rounded-lg" />}>
-        <QueueTable />
-      </Suspense>
+      <QueueTable />
     </div>
   )
 }

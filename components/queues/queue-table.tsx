@@ -1,7 +1,6 @@
 "use client"
 
 import * as React from "react"
-import { useSearchParams } from "next/navigation"
 import { Layers, Plus, Search } from "lucide-react"
 import {
   Table,
@@ -61,16 +60,7 @@ export function QueueTable() {
     : "/api/rabbitmq/queues"
   const { data: queues, error, loading, lastUpdated, refresh } = usePolling<Queue[]>(url)
 
-  const searchParams = useSearchParams()
-  const qParam = searchParams.get("q")
-  const [search, setSearch] = React.useState(qParam ?? "")
-  // Keep the filter in sync with ?q= deep links (command palette jumps) —
-  // state adjusted during render per React's derive-from-props pattern
-  const [prevQParam, setPrevQParam] = React.useState(qParam)
-  if (qParam !== prevQParam) {
-    setPrevQParam(qParam)
-    if (qParam !== null) setSearch(qParam)
-  }
+  const [search, setSearch] = React.useState("")
   const [stateFilter, setStateFilter] = React.useState<string>("all")
   const { sortKey, sortDir, toggle, compare } = useSort<SortKey>("name")
   const rowPad = useRowPadding()

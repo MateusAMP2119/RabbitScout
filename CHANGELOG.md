@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Metrics recording: with `METRICS_DB` set, the server writes the dashboard's metrics into a SQLite file every `METRICS_INTERVAL_SECONDS`, kept for `METRICS_RETENTION_DAYS` (see `.env.example`).
+- Each tracked stat tile draws its recorded history as a Kumo line chart behind it, following the selected time range.
+
+### Removed
+
+- The command palette (`Ctrl/⌘ K`), its header button, the `?q=` queue-filter deep link it used, and the `cmdk` dependency.
+- The refresh-cadence picker. Data now polls at a fixed 5s, which matches RabbitMQ's management stats interval, so faster polling returned identical numbers. Polling still pauses while the tab is hidden.
+- The unused broker connection-status store.
+
+### Changed
+
+- The vhost switcher only appears when the broker has more than one vhost. A saved scope that no longer exists resets to all vhosts.
+
 ## 2.0.0 — 2026-08-20
 
 A ground-up modernization: new framework generation, a redesigned interface, full queue/exchange management, and fixes for every open issue.

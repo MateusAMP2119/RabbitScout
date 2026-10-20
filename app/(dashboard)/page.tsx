@@ -1,32 +1,24 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { MessageSquare, Layers, Cable, Server, AlertTriangle } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Inbox, Rows3, Network, MemoryStick, Gauge, HardDrive, Files, Cpu, AlertTriangle } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Badge } from "@/components/ui/badge"
-import { StatCard } from "@/components/dashboard/stat-card"
-import { StreamingChart, type ColumnarData } from "@/components/dashboard/streaming-chart"
+import { StatCard, StatGrid } from "@/components/dashboard/stat-card"
+import { ChartLegend } from "@cloudflare/kumo/components/chart"
+import { Sparkline, TimeSeriesChart, useSeriesColors, type ColumnarData } from "@/components/dashboard/line-chart"
 import { DistributionDonut } from "@/components/dashboard/distribution-donut"
 import { TimeRangeSelect, TIME_RANGES, type TimeRangeKey } from "@/components/dashboard/time-range"
 import { ErrorCard } from "@/components/shared/error-card"
-import { AnimatedValue } from "@/components/shared/animated-value"
 import { usePolling } from "@/hooks/use-polling"
-import { useLiveSeries } from "@/hooks/use-live-series"
+import { useLiveSeries, WINDOW_SEC } from "@/hooks/use-live-series"
 import { ratesFromSamples, gaugeFromSamples, pickBaseAxis, alignToAxis } from "@/lib/chart-data"
-import { formatBytes, formatUptime, formatNumber, formatRate } from "@/lib/utils"
+import { cn, formatBytes, formatNumber, formatRate } from "@/lib/utils"
 import type { Overview, Queue, NodeStats } from "@/lib/rabbitmq/types"
+import type { HistoryColumn, MetricsHistory } from "@/lib/metrics/history"
 
-const RATE_SERIES = [
-  { label: "Publish", stroke: "hsl(24 95% 53%)", fill: "hsl(24 95% 53% / 0.08)" },
-  { label: "Deliver", stroke: "hsl(142 66% 46%)", fill: "hsl(142 66% 46% / 0.06)" },
-]
-
-const QUEUED_SERIES = [
-  { label: "Total", stroke: "hsl(0 72% 55%)", fill: "hsl(0 72% 55% / 0.06)" },
-  { label: "Ready", stroke: "hsl(38 92% 52%)", fill: "hsl(38 92% 52% / 0.05)" },
-  { label: "Unacked", stroke: "hsl(217 91% 62%)", fill: "hsl(217 91% 62% / 0.05)" },
-]
+const RATE_LABELS = ["Publish", "Deliver"]
+const QUEUED_LABELS = ["Total", "Ready", "Unacked"]
 
 // ── Main page ──────────────────────────────────────────────────
 
@@ -44,6 +36,13 @@ export default function OverviewPage() {
   const { data: nodeStats } = usePolling<NodeStats | null>(
     overview?.node ? `/api/rabbitmq/nodes/${encodeURIComponent(overview.node)}` : null,
   )
+
+  // Sparklines behind the stat tiles: the recorded history over the chart's range
+  const { data: history } = usePolling<MetricsHistory>(`/api/metrics?seconds=${isLive ? WINDOW_SEC : rangeDef.age}`)
+  const spark = (column: HistoryColumn) =>
+    history && history.ts.length > 0 ? (
+      <Sparkline from={history.from} to={history.to} ts={history.ts} values={history.series[column]} height={48} />
+    ) : undefined
 
   // Live mode: accumulate a rolling client-side window
   const live = useLiveSeries(isLive ? overview : null, lastUpdated)
@@ -82,6 +81,11 @@ export default function OverviewPage() {
     ? [live.timestamps, live.totalMessages, live.readyMessages, live.unackedMessages]
     : historical?.queuedData ?? [[], [], [], []]
 
+  // Kumo's categorical palette; the header legends reuse the same colours
+  const colors = useSeriesColors(QUEUED_LABELS.length)
+  const rateSeries = useMemo(() => RATE_LABELS.map((label, i) => ({ label, color: colors[i] })), [colors])
+  const queuedSeries = useMemo(() => QUEUED_LABELS.map((label, i) => ({ label, color: colors[i] })), [colors])
+
   const queueDist = useMemo(() => {
     if (!queues) return []
     const sorted = [...queues].sort((a, b) => b.messages - a.messages)
@@ -115,167 +119,131 @@ export default function OverviewPage() {
 
   return (
     <div className="space-y-5">
-      {/* ── Stat cards ── */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Total Messages"
-          value={ov.queue_totals?.messages ?? 0}
-          subtitle={`${formatNumber(ov.queue_totals?.messages_ready ?? 0)} ready · ${formatNumber(ov.queue_totals?.messages_unacknowledged ?? 0)} unacked`}
-          icon={MessageSquare}
-        />
-        <StatCard
-          title="Queues"
-          value={ov.object_totals?.queues ?? 0}
-          subtitle={`${formatNumber(ov.object_totals?.exchanges ?? 0)} exchanges`}
-          icon={Layers}
-        />
-        <StatCard
-          title="Connections"
-          value={ov.object_totals?.connections ?? 0}
-          subtitle={`${formatNumber(ov.object_totals?.channels ?? 0)} channels · ${formatNumber(ov.object_totals?.consumers ?? 0)} consumers`}
-          icon={Cable}
-        />
-        <StatCard
-          title="Memory"
-          value={nodeStats?.mem_used ?? 0}
-          format={(n) => formatBytes(n)}
-          subtitle={nodeStats?.uptime ? `Up ${formatUptime(nodeStats.uptime)}` : undefined}
-          icon={Server}
-        />
-      </div>
+      {/* Stat strip, range toolbar and the graphs stack flush */}
+      <div>
+        {/* ── Stat cards ── */}
+        <StatGrid>
+          <StatCard
+            title="Total Messages"
+            value={ov.queue_totals?.messages ?? 0}
+            icon={Inbox}
+            background={spark("messages")}
+          />
+          <StatCard
+            title="Memory"
+            value={nodeStats?.mem_used ?? 0}
+            format={(n) => formatBytes(n)}
+            icon={MemoryStick}
+            background={spark("mem_used")}
+          />
+          <StatCard
+            title="Queues"
+            value={ov.object_totals?.queues ?? 0}
+            icon={Rows3}
+            background={spark("queues")}
+          />
+          <StatCard
+            title="Connections"
+            value={ov.object_totals?.connections ?? 0}
+            icon={Network}
+            background={spark("connections")}
+          />
 
-      {/* ── Range control ── */}
-      <div className="flex items-center justify-between">
-        <TimeRangeSelect value={range} onChange={setRange} />
-        {hasAlarm && (
-          <Badge variant="destructive" className="gap-1">
-            <AlertTriangle className="h-3 w-3" />
-            {nodeStats?.mem_alarm ? "Memory alarm" : "Disk alarm"}
-          </Badge>
-        )}
-      </div>
+          {/* ── Cluster details ── */}
+          <StatCard title="Rates mode" value={ov.rates_mode || "—"} icon={Gauge} />
+          {nodeStats && (
+            <>
+              <StatCard
+                title="Disk free"
+                value={nodeStats.disk_free ?? 0}
+                format={(n) => formatBytes(n)}
+                icon={HardDrive}
+                background={spark("disk_free")}
+              />
+              <StatCard
+                title="File descriptors"
+                value={`${formatNumber(nodeStats.fd_used ?? 0)} / ${formatNumber(nodeStats.fd_total ?? 0)}`}
+                icon={Files}
+                background={spark("fd_used")}
+              />
+              <StatCard
+                title="Erlang"
+                value={`${formatNumber(nodeStats.proc_used ?? 0)} / ${formatNumber(nodeStats.proc_total ?? 0)}`}
+                icon={Cpu}
+                background={spark("proc_used")}
+              />
+            </>
+          )}
+        </StatGrid>
 
-      {/* ── Charts + Cluster info row ── */}
-      <div className="grid gap-4 lg:grid-cols-12">
-        <Card className="flex flex-col lg:col-span-8">
-          <CardHeader className="shrink-0 pb-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Message Rates
-              </CardTitle>
-              <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
+        <Band className="xl:grid-cols-3">
+          {/* ── Range control ── */}
+          <div className="flex h-12 items-stretch bg-card xl:col-span-3">
+            <TimeRangeSelect value={range} onChange={setRange} />
+            <div className="ml-auto flex items-center gap-4 px-4 text-[11px] text-muted-foreground">
+              {isLive && (
                 <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-primary" />
-                  Publish <span className="font-mono tnum">{formatRate(publishRate)}</span>
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-success" />
-                  Deliver <span className="font-mono tnum">{formatRate(deliveryRate)}</span>
-                </span>
-                {isLive && (
-                  <span className="flex items-center gap-1">
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
-                    </span>
-                    Live
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
                   </span>
-                )}
-              </div>
+                  Live
+                </span>
+              )}
+              {hasAlarm && (
+                <Badge variant="destructive" className="gap-1">
+                  <AlertTriangle className="h-3 w-3" />
+                  {nodeStats?.mem_alarm ? "Memory alarm" : "Disk alarm"}
+                </Badge>
+              )}
             </div>
-          </CardHeader>
-          <CardContent className="flex-1 pb-4">
-            <StreamingChart data={rateData} series={RATE_SERIES} yAxisFormat={(v) => `${Math.round(v)}/s`} />
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Cluster Info */}
-        <Card className="lg:col-span-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Cluster</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <InfoRow label="Node" value={ov.node || "—"} mono />
-            <InfoRow label="RabbitMQ" value={ov.management_version || "—"} />
-            <InfoRow label="Rates mode" value={ov.rates_mode || "—"} />
-            {nodeStats && (
-              <>
-                <InfoRow label="Disk free" value={formatBytes(nodeStats.disk_free ?? 0)} mono />
-                <InfoRow
-                  label="File descriptors"
-                  value={`${formatNumber(nodeStats.fd_used ?? 0)} / ${formatNumber(nodeStats.fd_total ?? 0)}`}
-                  mono
-                />
-                <InfoRow
-                  label="Sockets"
-                  value={`${formatNumber(nodeStats.sockets_used ?? 0)} / ${formatNumber(nodeStats.sockets_total ?? 0)}`}
-                  mono
-                />
-                <InfoRow
-                  label="Erlang processes"
-                  value={`${formatNumber(nodeStats.proc_used ?? 0)} / ${formatNumber(nodeStats.proc_total ?? 0)}`}
-                  mono
-                />
-              </>
-            )}
-            {ov.listeners && ov.listeners.length > 0 && (
-              <div>
-                <p className="mb-1 text-[10px] uppercase tracking-widest text-muted-foreground/60">
-                  Listeners
-                </p>
-                <div className="space-y-0.5">
-                  {ov.listeners.slice(0, 4).map((l, i) => (
-                    <p key={i} className="font-mono text-xs text-muted-foreground">
-                      {l.protocol} :{l.port}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+          {/* Each panel is nine 48px rows: title, legend, then a seven-row (336px) chart */}
 
-      {/* ── Bottom row ── */}
-      <div className="grid gap-4 lg:grid-cols-12">
-        <Card className="flex flex-col lg:col-span-8">
-          <CardHeader className="shrink-0 pb-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Queued Messages
-              </CardTitle>
-              <div className="flex items-center gap-4 text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-destructive" />
-                  Total <AnimatedValue value={ov.queue_totals?.messages ?? 0} className="font-mono tnum" />
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-warning" />
-                  Ready <AnimatedValue value={ov.queue_totals?.messages_ready ?? 0} className="font-mono tnum" />
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-info" />
-                  Unacked <AnimatedValue value={ov.queue_totals?.messages_unacknowledged ?? 0} className="font-mono tnum" />
-                </span>
-              </div>
+          {/* ── Message rates ── */}
+          <section className="bg-card">
+            <BandHeader title="Message Rates" />
+            <BandLegend>
+              <ChartLegend.SmallItem name="Publish" color={colors[0]} value={formatRate(publishRate)} />
+              <ChartLegend.SmallItem name="Deliver" color={colors[1]} value={formatRate(deliveryRate)} />
+            </BandLegend>
+            <TimeSeriesChart
+              data={rateData}
+              series={rateSeries}
+              yAxisFormat={(v) => `${Math.round(v)}/s`}
+              height={336}
+            />
+          </section>
+
+          {/* ── Queued messages ── */}
+          <section className="bg-card">
+            <BandHeader title="Queued Messages" />
+            <BandLegend>
+              <ChartLegend.SmallItem name="Total" color={colors[0]} value={formatNumber(ov.queue_totals?.messages ?? 0)} />
+              <ChartLegend.SmallItem name="Ready" color={colors[1]} value={formatNumber(ov.queue_totals?.messages_ready ?? 0)} />
+              <ChartLegend.SmallItem
+                name="Unacked"
+                color={colors[2]}
+                value={formatNumber(ov.queue_totals?.messages_unacknowledged ?? 0)}
+              />
+            </BandLegend>
+            <TimeSeriesChart
+              data={queuedData}
+              series={queuedSeries}
+              yAxisFormat={(v) => v.toLocaleString()}
+              height={336}
+            />
+          </section>
+
+          {/* ── Queue distribution: the donut carries its own legend, so it takes all eight rows ── */}
+          <section className="bg-card">
+            <BandHeader title="Queue Distribution" />
+            <div className="h-96 p-4">
+              <DistributionDonut data={queueDist} />
             </div>
-          </CardHeader>
-          <CardContent className="flex-1 pb-4">
-            <StreamingChart data={queuedData} series={QUEUED_SERIES} yAxisFormat={(v) => v.toLocaleString()} />
-          </CardContent>
-        </Card>
-
-        {/* Queue Distribution */}
-        <Card className="flex flex-col lg:col-span-4">
-          <CardHeader className="shrink-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Queue Distribution
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="min-h-[220px] flex-1">
-            <DistributionDonut data={queueDist} />
-          </CardContent>
-        </Card>
+          </section>
+        </Band>
       </div>
     </div>
   )
@@ -283,53 +251,48 @@ export default function OverviewPage() {
 
 // ── Helper components ──────────────────────────────────────────
 
-function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+// Continues the stat strip below it: bleeds through <main>'s side padding, and the
+// 1px gap over a border-coloured background draws the hairlines between rows.
+function Band({ className, ...props }: React.ComponentProps<"div">) {
+  return <div className={cn("-mx-4 grid gap-px border-b bg-border lg:-mx-6", className)} {...props} />
+}
+
+// One 48px row, labelled like the stat tiles; children sit at the right
+function BandHeader({ title, children }: { title: string; children?: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between text-xs">
-      <span className="text-muted-foreground/70">{label}</span>
-      <span className={mono ? "font-mono text-foreground tnum" : "text-foreground"}>{value}</span>
+    <div className="flex h-12 items-center gap-4 border-b px-4 text-[11px] text-muted-foreground">
+      <h2 className="mr-auto truncate font-medium uppercase tracking-widest text-muted-foreground/70">
+        {title}
+      </h2>
+      {children}
     </div>
   )
+}
+
+function BandLegend({ children }: { children: React.ReactNode }) {
+  return <div className="flex h-12 items-center gap-4 overflow-hidden border-b px-4">{children}</div>
 }
 
 function OverviewSkeleton() {
   return (
     <div className="space-y-5">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i}>
-            <CardContent className="p-5">
-              <Skeleton className="mb-3 h-3 w-20" />
-              <Skeleton className="mb-2 h-7 w-24" />
-              <Skeleton className="h-3 w-32" />
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-      <Skeleton className="h-7 w-56" />
-      <div className="grid gap-4 lg:grid-cols-12">
-        <Card className="lg:col-span-8">
-          <CardContent className="p-5">
-            <Skeleton className="h-[200px] w-full" />
-          </CardContent>
-        </Card>
-        <Card className="lg:col-span-4">
-          <CardContent className="p-5">
-            <Skeleton className="h-[200px] w-full" />
-          </CardContent>
-        </Card>
-      </div>
-      <div className="grid gap-4 lg:grid-cols-12">
-        <Card className="lg:col-span-8">
-          <CardContent className="p-5">
-            <Skeleton className="h-[200px] w-full" />
-          </CardContent>
-        </Card>
-        <Card className="lg:col-span-4">
-          <CardContent className="p-5">
-            <Skeleton className="h-[200px] w-full" />
-          </CardContent>
-        </Card>
+      <div>
+        <StatGrid>
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className="flex h-12 items-center justify-between bg-card px-4">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-5 w-16" />
+            </div>
+          ))}
+        </StatGrid>
+        <Band className="xl:grid-cols-3">
+          <div className="h-12 bg-card xl:col-span-3" />
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-card p-4">
+              <Skeleton className="h-[400px] w-full" />
+            </div>
+          ))}
+        </Band>
       </div>
     </div>
   )
