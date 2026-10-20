@@ -1,0 +1,23 @@
+name: Deploy to tiger
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency: deploy-tiger
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, tiger]
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build image
+        run: docker build -t rabbitscout:latest .
+
+      - name: Restart container
+        run: |
+          cd ~/services/rabbitscout
+          docker compose up -d
+          docker image prune -f
