@@ -32,7 +32,7 @@ export function classifyError(error: unknown): RabbitMQError {
     if (msg.includes('econnrefused') || msg.includes('fetch failed')) {
       return new RabbitMQError(
         503,
-        'Unable to connect to RabbitMQ. Check your connection settings.',
+        'Check your connection settings.',
         'CONNECTION',
         error.message,
       )

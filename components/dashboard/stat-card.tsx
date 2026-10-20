@@ -14,9 +14,7 @@ interface StatCardProps {
 
 export function StatCard({ title, value, format, subtitle, icon: Icon }: StatCardProps) {
   return (
-    <Card className="relative overflow-hidden card-hover glow-primary">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
-
+    <Card className="relative overflow-hidden card-hover">
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div className="space-y-1.5">

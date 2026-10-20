@@ -1,38 +1,38 @@
 "use client"
 
-import { Suspense, useState } from "react"
+import { Suspense, useState, type FormEvent } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import Image from "next/image"
-import { Eye, EyeOff, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { AlertCircle, X } from "lucide-react"
 import { useAuth } from "@/lib/auth/store"
-import { motion } from "motion/react"
+import { RabbitMark } from "@/components/shared/rabbit-mark"
+import { LoginForm } from "@/components/login-01/login-form"
+import "./login.css"
 
-function LoginForm() {
+function LoginScreen() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { setAuth } = useAuth()
   const [loading, setLoading] = useState(false)
-  const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  // The login-01 form submits up to here
+  const handleSubmit = async (e: FormEvent<HTMLDivElement>) => {
     e.preventDefault()
+    if (loading) return
+
+    const fields = (e.target as HTMLFormElement).elements
+    const username = (fields.namedItem("username") as HTMLInputElement).value
+    const password = (fields.namedItem("password") as HTMLInputElement).value
+
+    // 1. Empty fields show as a toast
+    if (!username || !password) {
+      setError(!username ? "Username missing" : "Password missing")
+      return
+    }
     setLoading(true)
     setError(null)
 
-    const form = new FormData(e.currentTarget)
-    const username = form.get("username") as string
-    const password = form.get("password") as string
-
-    if (!username || !password) {
-      setError("Both fields are required")
-      setLoading(false)
-      return
-    }
-
+    // 2. RabbitMQ checks the credentials; a refusal shows as a toast
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
@@ -75,125 +75,38 @@ function LoginForm() {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden p-4">
-      {/* Ambient background */}
-      <div className="pointer-events-none absolute inset-0 bg-background" />
-      <div className="pointer-events-none absolute left-1/2 top-1/4 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.04] blur-[120px]" />
-      <div className="pointer-events-none absolute bottom-0 right-0 h-[300px] w-[400px] rounded-full bg-primary/[0.03] blur-[80px]" />
-
-      <motion.div
-        initial={{ opacity: 0, y: 16, scale: 0.98 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: [0.25, 0.1, 0.25, 1] }}
-        className="relative z-10 w-full max-w-[320px]"
-      >
-        {/* Logo + branding */}
-        <motion.div
-          className="mb-10 text-center"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.15, duration: 0.4 }}
-        >
-          <div className="mb-4 flex justify-center">
-            <div className="relative">
-              <Image src="/images/logo.png" alt="RabbitScout" width={48} height={48} priority />
-              <div className="absolute inset-0 -z-10 scale-150 rounded-full bg-primary/10 blur-xl" />
-            </div>
+    <main className="ob-page">
+      {/* Only the form is centred: the equal 1fr rows either side keep it in the middle,
+          and the mark hangs off its top edge (the top row grows if the screen is too short) */}
+      <div className="grid min-h-svh w-full grid-rows-[1fr_auto_1fr] justify-items-center p-6 md:p-10">
+        <div className="flex w-full max-w-sm flex-col justify-end">
+          <div className="ob-mark">
+            <RabbitMark className="ob-mark-rabbit" />
+            <span className="ob-mark-name">RabbitMQ</span>
           </div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            Rabbit<span className="text-primary">Scout</span>
-          </h1>
-          <p className="mt-1.5 text-[13px] text-muted-foreground">
-            Sign in with your RabbitMQ credentials
-          </p>
-        </motion.div>
-
-        <motion.form
-          onSubmit={handleSubmit}
-          className="space-y-5"
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-        >
-          <div className="space-y-1.5">
-            <Label htmlFor="username" className="text-xs font-medium text-muted-foreground">
-              Username
-            </Label>
-            <Input
-              id="username"
-              name="username"
-              placeholder="guest"
-              autoComplete="username"
-              autoFocus
-              disabled={loading}
-              className="h-10 border-transparent bg-secondary/50 transition-all focus:border-border focus:bg-background"
-            />
+          <h1 className="sr-only">Log in to RabbitMQ</h1>
+        </div>
+        <LoginForm onSubmit={handleSubmit} className="w-full max-w-sm" />
+      </div>
+      {error && (
+        <div className="ob-toasts">
+          <div className="ob-toast">
+            <AlertCircle className="ob-toast-icon" />
+            <p role="alert">{error}</p>
+            <button type="button" aria-label="Dismiss" onClick={() => setError(null)}>
+              <X size={14} />
+            </button>
           </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="password" className="text-xs font-medium text-muted-foreground">
-              Password
-            </Label>
-            <div className="relative">
-              <Input
-                id="password"
-                name="password"
-                type={showPw ? "text" : "password"}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                disabled={loading}
-                className="h-10 border-transparent bg-secondary/50 pr-10 transition-all focus:border-border focus:bg-background"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPw(!showPw)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/60 transition-colors hover:text-foreground"
-                tabIndex={-1}
-              >
-                {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-          </div>
-
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-lg bg-destructive/10 px-3 py-2.5 text-xs text-destructive"
-            >
-              {error}
-            </motion.div>
-          )}
-
-          <Button type="submit" className="h-10 w-full font-medium" disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Connecting…
-              </>
-            ) : (
-              "Sign In"
-            )}
-          </Button>
-        </motion.form>
-
-        <motion.p
-          className="mt-6 text-center text-[11px] text-muted-foreground/50"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-        >
-          Credentials are validated directly against your RabbitMQ instance
-        </motion.p>
-      </motion.div>
-    </div>
+        </div>
+      )}
+    </main>
   )
 }
 
 export default function LoginPage() {
   return (
     <Suspense>
-      <LoginForm />
+      <LoginScreen />
     </Suspense>
   )
 }

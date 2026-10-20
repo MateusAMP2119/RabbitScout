@@ -1,0 +1,37 @@
+/* Login screen: the shadcn login-01 block on shadcn's v4 neutral theme, with the app's orange (globals.css) as primary; the toast comes from the Fontes app's sign-in (fontes-app Toast.css). */
+.ob-page{--ob-text:#ededee;--ob-muted:#8d8d93;position:relative;isolation:isolate;color-scheme:dark;-webkit-text-size-adjust:100%;text-size-adjust:100%;
+  --radius:0.625rem;--background:oklch(1 0 0);--foreground:oklch(0.145 0 0);--card:oklch(1 0 0);--card-foreground:oklch(0.145 0 0);--popover:oklch(1 0 0);--popover-foreground:oklch(0.145 0 0);--primary:hsl(24 95% 50%);--primary-foreground:hsl(0 0% 100%);--secondary:oklch(0.97 0 0);--secondary-foreground:oklch(0.205 0 0);--muted:oklch(0.97 0 0);--muted-foreground:oklch(0.556 0 0);--accent:oklch(0.97 0 0);--accent-foreground:oklch(0.205 0 0);--destructive:oklch(0.577 0.245 27.325);--border:oklch(0.922 0 0);--input:oklch(0.922 0 0);--ring:oklch(0.708 0 0)}
+.dark .ob-page{--background:oklch(0.145 0 0);--foreground:oklch(0.985 0 0);--card:oklch(0.205 0 0);--card-foreground:oklch(0.985 0 0);--popover:oklch(0.205 0 0);--popover-foreground:oklch(0.985 0 0);--primary:hsl(24 95% 53%);--primary-foreground:hsl(0 0% 100%);--secondary:oklch(0.269 0 0);--secondary-foreground:oklch(0.985 0 0);--muted:oklch(0.269 0 0);--muted-foreground:oklch(0.708 0 0);--accent:oklch(0.269 0 0);--accent-foreground:oklch(0.985 0 0);--destructive:oklch(0.704 0.191 22.216);--border:oklch(1 0 0 / 10%);--input:oklch(1 0 0 / 15%);--ring:oklch(0.556 0 0)}
+html:has(.ob-page){background:#000;color-scheme:dark}
+/* Clips the glow behind the mark so it never adds scrollbars */
+.ob-page{overflow:clip}
+body:has(.ob-page){background:transparent}
+body:has(.ob-page)::after{display:none}
+
+/* The 3D rabbit and its name, centred together above the form; a click on the rabbit makes it hop.
+   The canvas keeps room above the rabbit for the hop, so the name sits lower to line up with the rabbit.
+   The canvas also has empty room left of the rabbit, so the group is nudged 8px left to look centred. */
+.ob-mark{position:relative;left:-8px;display:flex;align-items:center;justify-content:center;gap:6px;margin-bottom:16px}
+/* A neutral light centred on the mark: bright around the rabbit, gone 620px out; it sits behind the form too */
+.ob-mark::before{content:"";position:absolute;z-index:-1;left:50%;top:50%;width:1240px;height:1240px;translate:-50% -50%;pointer-events:none;background:radial-gradient(circle closest-side,#ffffff14,#ffffff05 52%,#ffffff00)}
+.ob-mark-rabbit{display:block;position:relative;top:-8px;width:72px;height:112px;cursor:pointer}
+.ob-mark-name{padding-top:22px;font-family:"SF Pro Display","SF Pro",-apple-system,BlinkMacSystemFont,system-ui,sans-serif;font-size:20px;font-weight:600;letter-spacing:-.3px;color:var(--ob-text)}
+
+.ob-toasts{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom,0px));left:0;right:0;width:fit-content;max-width:min(420px,calc(100% - 32px));margin-inline:auto;z-index:7;display:flex;flex-direction:column;gap:8px}
+.ob-toast{display:flex;align-items:center;gap:8px;padding:7px 8px 7px 12px;border:1px solid #ffffff14;border-radius:12px;background:#202022;color:var(--ob-text);box-shadow:0 8px 28px #0003;font-size:13px;line-height:1.5;text-align:left;animation:ob-toast-enter .3s ease-out}
+.ob-toast p{min-width:0;overflow-wrap:anywhere}
+.ob-toast-icon{flex:none;width:16px;height:16px;color:var(--ob-muted)}
+.ob-toast button{display:grid;place-items:center;flex:none;width:22px;height:22px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--ob-muted);cursor:pointer}
+.ob-toast button:hover{background:#ffffff08;color:var(--ob-text)}
+.ob-toast button:focus-visible{outline:2px solid #95c1fb;outline-offset:2px}
+@keyframes ob-toast-enter{from{opacity:0}to{opacity:1}}
+
+@media(prefers-reduced-motion:reduce){.ob-toast{animation:none}}
+
+@media(prefers-color-scheme:light){
+  html:has(.ob-page){background:#fff;color-scheme:light}
+  .ob-page{--ob-text:#222225;--ob-muted:#73737c;color-scheme:light}
+  .ob-mark::before{background:radial-gradient(circle closest-side,#0000000a,#00000003 52%,#00000000)}
+  .ob-toast{background:#fff;border-color:#e4e4e7;box-shadow:0 8px 28px #00000012}
+  .ob-toast button:hover{background:#00000005}
+}
