@@ -23,9 +23,7 @@ A modern, open-source dashboard for RabbitMQ management. Built as a clean altern
 
 **Channels** — View channel state, prefetch counts, rates, and consumer counts.
 
-**Command palette** — `Ctrl/⌘ K` to jump to any page or queue, toggle the theme, or pause live updates.
-
-**Live-data controls** — Broker connection status in the header, a refresh-cadence picker (2s → 30s or paused), automatic pause while the tab is hidden, and a global vhost scope switcher.
+**Live data** — Polls every 5s (RabbitMQ's stats interval), pauses while the tab is hidden, and offers a global vhost scope switcher when the broker has more than one vhost.
 
 **Auth** — Pass-through authentication. Each user logs in with their own RabbitMQ credentials. No server-side password storage. Works on RabbitMQ 3.x and 4.x.
 
@@ -157,7 +155,6 @@ docker run -p 3000:3000 -e RABBITMQ_HOST=localhost -e RABBITMQ_PORT=15672 rabbit
 - **Language**: TypeScript (strict mode)
 - **UI**: [shadcn/ui](https://ui.shadcn.com)-style components on [Radix UI](https://www.radix-ui.com) + [Tailwind CSS v4](https://tailwindcss.com)
 - **Charts**: [uPlot](https://github.com/leeoniya/uPlot) (canvas streaming + history) and a hand-rolled SVG donut — no chart mega-dependencies
-- **Command palette**: [cmdk](https://cmdk.paco.me)
 - **Animation**: [Motion](https://motion.dev)
 - **State**: [Zustand](https://zustand-demo.pmnd.rs)
 - **Icons**: [Lucide](https://lucide.dev)
@@ -190,7 +187,7 @@ proxy.ts                          Auth gate: 401 JSON for APIs, login redirect f
 lib/
   rabbitmq/                       API client, config, types, error classification
   auth/                           Session cookie helpers, client auth store
-  stores/preferences.ts           Refresh cadence, vhost scope, density, sidebar
+  stores/preferences.ts           Vhost scope, density, sidebar
 
 hooks/
   use-polling.ts                  Visibility-aware polling with abort + status reporting
@@ -198,7 +195,7 @@ hooks/
   use-toast.ts                    Toast state
 
 components/
-  layout/                         Sidebar, header, command palette
+  layout/                         Sidebar, header
   dashboard/                      Stat cards, streaming charts, donut, time ranges
   queues/                         Table, drawer, message viewer, publish/create/delete
   exchanges/                      Table, binding viewer + add-binding, create dialog

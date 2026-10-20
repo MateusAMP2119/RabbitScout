@@ -22,11 +22,12 @@ export default function DashboardLayout({
       {/* Fades in over the login screen after logging in (see globals.css) */}
       <React.ViewTransition enter={{ login: "login-fade", default: "none" }} default="none">
         <div className="min-h-screen">
+          <Header onMobileMenu={() => setMobileNavOpen(true)} />
           <Sidebar />
 
           {/* Mobile navigation drawer */}
           <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-            <SheetContent side="left" className="w-[240px] bg-sidebar p-0 sm:max-w-[240px]">
+            <SheetContent side="left" className="w-40 bg-sidebar p-0 sm:max-w-40">
               <SheetTitle className="sr-only">Navigation</SheetTitle>
               <div className="flex h-full flex-col">
                 <SidebarContent onNavigate={() => setMobileNavOpen(false)} />
@@ -34,13 +35,7 @@ export default function DashboardLayout({
             </SheetContent>
           </Sheet>
 
-          <div
-            className={cn(
-              "transition-[margin-left] duration-200 ease-in-out",
-              sidebarCollapsed ? "lg:ml-16" : "lg:ml-[220px]",
-            )}
-          >
-            <Header onMobileMenu={() => setMobileNavOpen(true)} />
+          <div className={cn(sidebarCollapsed ? "lg:ml-16" : "lg:ml-40")}>
             <main className="p-4 lg:p-6">
               <ErrorBoundary>{children}</ErrorBoundary>
             </main>

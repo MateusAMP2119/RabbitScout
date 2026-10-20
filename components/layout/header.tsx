@@ -1,84 +1,47 @@
 "use client"
 
 import * as React from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useTheme } from "next-themes"
 import {
   Check,
   ChevronDown,
-  Command as CommandIcon,
   Globe,
   LogOut,
   Menu,
   Moon,
-  Pause,
-  RefreshCw,
-  ShieldCheck,
   Sun,
-  User,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import { CommandMenu } from "@/components/layout/command-menu"
+import { SidebarMark } from "@/components/layout/sidebar"
+import { Identicon } from "@/components/shared/identicon"
 import { useAuth } from "@/lib/auth/store"
-import {
-  REFRESH_INTERVALS,
-  useConnectionStatus,
-  usePreferences,
-} from "@/lib/stores/preferences"
+import { usePreferences } from "@/lib/stores/preferences"
 import { usePolling } from "@/hooks/use-polling"
 import { cn } from "@/lib/utils"
 import type { VHost } from "@/lib/rabbitmq/types"
 
-const PAGE_TITLES: Record<string, string> = {
-  "/": "Overview",
-  "/queues": "Queues",
-  "/exchanges": "Exchanges",
-  "/connections": "Connections",
-  "/channels": "Channels",
-}
-
-const STATUS_META = {
-  connected: { label: "Connected", dot: "bg-success", pulse: false },
-  degraded: { label: "Degraded", dot: "bg-warning", pulse: true },
-  disconnected: { label: "Disconnected", dot: "bg-destructive", pulse: true },
-  unknown: { label: "Connecting", dot: "bg-muted-foreground", pulse: false },
-} as const
+// Header controls are full-height cells split by hairlines, flush to the right edge,
+// in the same foreground as the sidebar's RabbitMQ wordmark
+const CELL = "h-12 rounded-none border-l border-border/60 text-foreground hover:bg-muted/50"
 
 export function Header({ onMobileMenu }: { onMobileMenu?: () => void }) {
-  const pathname = usePathname()
   const router = useRouter()
   const { setTheme, resolvedTheme } = useTheme()
   const { user, clearAuth, hydrate } = useAuth()
-  const { refreshInterval, setRefreshInterval, vhost, setVhost } = usePreferences()
-  const status = useConnectionStatus((s) => s.status)
-  const [paletteOpen, setPaletteOpen] = React.useState(false)
+  const { vhost, setVhost } = usePreferences()
 
   // Restore user info after hard reloads
   React.useEffect(() => {
     hydrate()
   }, [hydrate])
-
-  // Global shortcut: ⌘K / Ctrl+K
-  React.useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault()
-        setPaletteOpen((v) => !v)
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [])
 
   // VHost list refreshes slowly — it rarely changes
   const { data: vhosts } = usePolling<VHost[]>("/api/rabbitmq/vhosts", { interval: 60_000 })
@@ -89,149 +52,100 @@ export function Header({ onMobileMenu }: { onMobileMenu?: () => void }) {
     router.push("/login")
   }
 
-  const title = PAGE_TITLES[pathname] ?? "RabbitScout"
-  const meta = STATUS_META[status]
-  const currentInterval = REFRESH_INTERVALS.find((i) => i.value === refreshInterval)
+  // Most brokers only have "/" — the scope picker is noise until there's a choice
+  const showVhostPicker = (vhosts?.length ?? 0) > 1
+
+  // Drop a persisted scope that no longer narrows anything (vhost deleted, or the only one)
+  React.useEffect(() => {
+    if (!vhosts || vhost === null) return
+    if (!showVhostPicker || !vhosts.some((v) => v.name === vhost)) setVhost(null)
+  }, [vhosts, vhost, showVhostPicker, setVhost])
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-border/60 bg-background/80 px-4 backdrop-blur-md lg:px-6">
-      {/* Mobile menu */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 lg:hidden"
-        onClick={onMobileMenu}
-      >
-        <Menu className="h-4 w-4" />
-        <span className="sr-only">Open navigation</span>
-      </Button>
-
-      <h1 className="text-[15px] font-semibold tracking-tight">{title}</h1>
-
-      {/* Broker status */}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="hidden items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] text-muted-foreground sm:inline-flex">
-            <span className="relative flex h-1.5 w-1.5">
-              {meta.pulse && (
-                <span className={cn("absolute inline-flex h-full w-full animate-ping rounded-full opacity-75", meta.dot)} />
-              )}
-              <span className={cn("relative inline-flex h-1.5 w-1.5 rounded-full", meta.dot)} />
-            </span>
-            {meta.label}
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Broker reachability, based on live polling</TooltipContent>
-      </Tooltip>
-
-      <div className="ml-auto flex items-center gap-1.5">
-        {/* VHost scope */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="hidden h-8 gap-1.5 px-2.5 text-xs text-muted-foreground md:inline-flex">
-              <Globe className="h-3.5 w-3.5" />
-              <span className="max-w-[120px] truncate font-mono">{vhost ?? "All vhosts"}</span>
-              <ChevronDown className="h-3 w-3 opacity-60" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[180px]">
-            <DropdownMenuLabel>Virtual host</DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => setVhost(null)}>
-              All vhosts
-              {vhost === null && <Check className="ml-auto h-4 w-4" />}
-            </DropdownMenuItem>
-            {(vhosts ?? []).map((v) => (
-              <DropdownMenuItem key={v.name} onClick={() => setVhost(v.name)}>
-                <span className="font-mono text-xs">{v.name}</span>
-                {vhost === v.name && <Check className="ml-auto h-4 w-4" />}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Refresh cadence */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 gap-1.5 px-2.5 text-xs text-muted-foreground">
-              {refreshInterval === 0 ? (
-                <>
-                  <Pause className="h-3.5 w-3.5 text-warning" />
-                  <span className="hidden sm:inline">Paused</span>
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">{currentInterval?.label ?? `${refreshInterval / 1000}s`}</span>
-                </>
-              )}
-              <ChevronDown className="h-3 w-3 opacity-60" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>Refresh every</DropdownMenuLabel>
-            {REFRESH_INTERVALS.map((opt) => (
-              <DropdownMenuItem key={opt.value} onClick={() => setRefreshInterval(opt.value)}>
-                {opt.label}
-                {refreshInterval === opt.value && <Check className="ml-auto h-4 w-4" />}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        {/* Command palette */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 gap-1.5 px-2.5 text-xs text-muted-foreground"
-              onClick={() => setPaletteOpen(true)}
-            >
-              <CommandIcon className="h-3.5 w-3.5" />
-              <kbd className="hidden rounded border bg-muted px-1 font-mono text-[10px] sm:inline">K</kbd>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Command palette (Ctrl+K)</TooltipContent>
-        </Tooltip>
-
-        {/* Theme */}
+    // Spans the whole width above the sidebar
+    <header className="sticky top-0 z-30 flex h-12 items-center border-b border-border/60 bg-background/80 backdrop-blur-md">
+      <SidebarMark />
+      <div className="flex min-w-0 flex-1 items-center gap-3 pl-4 lg:pl-6">
+        {/* Mobile menu */}
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8"
-          onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+          className="h-8 w-8 lg:hidden"
+          onClick={onMobileMenu}
         >
-          <Sun className="h-4 w-4 scale-100 rotate-0 transition-transform dark:-rotate-90 dark:scale-0" />
-          <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">Toggle theme</span>
+          <Menu className="h-4 w-4" />
+          <span className="sr-only">Open navigation</span>
         </Button>
 
-        {/* User */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <User className="h-4 w-4" />
-              <span className="sr-only">Account</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="min-w-[180px]">
-            <DropdownMenuLabel className="flex items-center gap-2 font-normal">
-              <span className="font-mono text-xs">{user?.username ?? "—"}</span>
-              {user?.isAdmin && (
-                <Badge variant="default" className="gap-0.5">
-                  <ShieldCheck className="h-2.5 w-2.5" /> admin
-                </Badge>
-              )}
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
-              <LogOut /> Log out
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        <div className="ml-auto flex items-stretch">
+          {/* VHost scope */}
+          {showVhostPicker && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className={cn(CELL, "hidden gap-1.5 px-4 text-xs md:inline-flex")}>
+                  <Globe className="h-3.5 w-3.5" />
+                  <span className="max-w-[120px] truncate font-mono">{vhost ?? "All vhosts"}</span>
+                  <ChevronDown className="h-3 w-3 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-[180px]">
+                <DropdownMenuLabel>Virtual host</DropdownMenuLabel>
+                <DropdownMenuItem onClick={() => setVhost(null)}>
+                  All vhosts
+                  {vhost === null && <Check className="ml-auto h-4 w-4" />}
+                </DropdownMenuItem>
+                {(vhosts ?? []).map((v) => (
+                  <DropdownMenuItem key={v.name} onClick={() => setVhost(v.name)}>
+                    <span className="font-mono text-xs">{v.name}</span>
+                    {vhost === v.name && <Check className="ml-auto h-4 w-4" />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
 
-      <CommandMenu open={paletteOpen} onOpenChange={setPaletteOpen} />
+          {/* Theme */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className={cn(CELL, "w-12")}
+            onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+          >
+            <Sun className="h-4 w-4 -translate-y-0.5 scale-100 rotate-0 transition-transform dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-4 w-4 -translate-y-0.5 rotate-90 scale-0 transition-transform dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+          </Button>
+
+          {/* Account: who's signed in, and the way out, in one cell */}
+          <div className="flex border-l border-border/60">
+            <div className="hidden -translate-y-0.5 items-center gap-2 pl-4 pr-1 sm:flex">
+              {user ? (
+                <Identicon value={user.username} className="h-6 w-6 rounded-[4px] ring-1 ring-border" />
+              ) : (
+                <span className="h-6 w-6 rounded-[4px] bg-muted" />
+              )}
+              <div className="flex flex-col items-start gap-1">
+                <span className="max-w-[160px] truncate text-[13px] font-medium leading-none text-foreground">
+                  {user?.username ?? "—"}
+                </span>
+                {user?.isAdmin && (
+                  <span className="text-[11px] leading-none text-muted-foreground">admin</span>
+                )}
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="group mr-2 h-12 w-12 rounded-none text-foreground hover:bg-transparent hover:text-foreground"
+              onClick={handleLogout}
+            >
+              {/* The icon's first two paths are the arrow — it slides out of the door on hover */}
+              <LogOut className="h-4 w-4 -translate-y-0.5 [&_path:not(:last-child)]:transition-transform [&_path:not(:last-child)]:duration-300 [&_path:not(:last-child)]:ease-out group-hover:[&_path:not(:last-child)]:translate-x-[3px] group-focus-visible:[&_path:not(:last-child)]:translate-x-[3px]" />
+              <span className="sr-only">Log out</span>
+            </Button>
+          </div>
+        </div>
+      </div>
     </header>
   )
 }

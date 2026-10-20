@@ -20,7 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { StreamingChart, type ColumnarData } from "@/components/dashboard/streaming-chart"
+import { TimeSeriesChart, useSeriesColors, type ColumnarData } from "@/components/dashboard/line-chart"
 import { MessageViewer } from "./message-viewer"
 import { PublishDialog } from "./publish-dialog"
 import { DeleteQueueDialog } from "./delete-queue-dialog"
@@ -37,10 +37,7 @@ interface QueueDrawerProps {
   onChanged?: () => void
 }
 
-const SPARK_SERIES = [
-  { label: "Publish", stroke: "hsl(24 95% 53%)", fill: "hsl(24 95% 53% / 0.08)" },
-  { label: "Deliver", stroke: "hsl(142 66% 46%)", fill: "hsl(142 66% 46% / 0.06)" },
-]
+const SPARK_LABELS = ["Publish", "Deliver"]
 
 export function QueueDrawer({ queue, open, onOpenChange, onChanged }: QueueDrawerProps) {
   const { toast } = useToast()
@@ -64,6 +61,9 @@ export function QueueDrawer({ queue, open, onOpenChange, onChanged }: QueueDrawe
       ? rawDetail
       : null
   const q = detail ?? queue
+
+  const colors = useSeriesColors(SPARK_LABELS.length)
+  const sparkSeries = React.useMemo(() => SPARK_LABELS.map((label, i) => ({ label, color: colors[i] })), [colors])
 
   const chartData: ColumnarData = React.useMemo(() => {
     const pub = ratesFromSamples(detail?.message_stats?.publish_details)
@@ -189,7 +189,7 @@ export function QueueDrawer({ queue, open, onOpenChange, onChanged }: QueueDrawe
               </h4>
               <div className="h-[160px]">
                 {chartData[0].length > 1 ? (
-                  <StreamingChart data={chartData} series={SPARK_SERIES} yAxisFormat={(v) => `${Math.round(v)}/s`} />
+                  <TimeSeriesChart data={chartData} series={sparkSeries} yAxisFormat={(v) => `${Math.round(v)}/s`} height={160} />
                 ) : (
                   <div className="flex h-full items-center justify-center rounded-lg border border-dashed text-xs text-muted-foreground">
                     Waiting for samples…

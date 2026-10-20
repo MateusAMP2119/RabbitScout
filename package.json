@@ -15,9 +15,10 @@
     "e2e": "node scripts/e2e.mjs"
   },
   "dependencies": {
+    "@cloudflare/kumo": "^2.15.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "cmdk": "^1.1.1",
+    "echarts": "^6.1.0",
     "lucide-react": "^1.45.0",
     "motion": "^13.2.0",
     "next": "16.4.2",
@@ -27,8 +28,6 @@
     "react-dom": "^19.2.0",
     "tailwind-merge": "^3.6.0",
     "three": "^0.186.1",
-    "uplot": "^1.6.32",
-    "uplot-react": "^1.2.4",
     "zustand": "^5.0.15"
   },
   "devDependencies": {

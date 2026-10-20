@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useRouter } from "next/navigation"
-import { usePreferences, useConnectionStatus } from "@/lib/stores/preferences"
+
+/**
+ * Default cadence. RabbitMQ's management stats refresh every 5s
+ * (collect_statistics_interval), so polling faster returns the same numbers.
+ */
+const POLL_INTERVAL = 5000
 
 interface UsePollingOptions {
-  /** Override the global cadence (ms). 0 disables polling (initial fetch still runs). */
+  /** Override the default cadence (ms). 0 disables polling (initial fetch still runs). */
   interval?: number
   /** Skip fetching entirely while false. */
   enabled?: boolean
@@ -22,21 +27,17 @@ interface UsePollingResult<T> {
 /**
  * Central polling hook for live RabbitMQ data.
  *
- * - Cadence follows the user's global refresh preference unless overridden
+ * - Polls every 5s unless overridden
  * - Pauses automatically while the tab is hidden, refreshes on return
  * - Skips ticks while a request is still in flight (no self-abort churn)
  * - Resets state when the target URL changes, so one target's payload is
  *   never rendered under another target's identity
- * - Feeds the header's broker-status indicator
  * - On auth expiry (401) clears the session and returns to the login page
  */
 export function usePolling<T>(url: string | null, options: UsePollingOptions = {}): UsePollingResult<T> {
   const router = useRouter()
-  const globalInterval = usePreferences((s) => s.refreshInterval)
-  const reportSuccess = useConnectionStatus((s) => s.reportSuccess)
-  const reportError = useConnectionStatus((s) => s.reportError)
 
-  const interval = options.interval ?? globalInterval
+  const interval = options.interval ?? POLL_INTERVAL
   const enabled = options.enabled ?? true
 
   const [data, setData] = useState<T | null>(null)
@@ -96,7 +97,6 @@ export function usePolling<T>(url: string | null, options: UsePollingOptions = {
           // Non-JSON error body
         }
         setError(message)
-        reportError()
         return
       }
 
@@ -105,16 +105,14 @@ export function usePolling<T>(url: string | null, options: UsePollingOptions = {
       setData(json)
       setError(null)
       setLastUpdated(Date.now())
-      reportSuccess()
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return
       setError("Unable to reach the server")
-      reportError()
     } finally {
       inFlightRef.current = false
       if (!controller.signal.aborted) setLoading(false)
     }
-  }, [router, reportSuccess, reportError])
+  }, [router])
 
   useEffect(() => {
     urlRef.current = url

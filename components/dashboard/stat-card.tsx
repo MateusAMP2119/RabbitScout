@@ -1,40 +1,46 @@
 "use client"
 
-import { Card, CardContent } from "@/components/ui/card"
-import { AnimatedValue } from "@/components/shared/animated-value"
+import { cn, formatNumber } from "@/lib/utils"
 import type { LucideIcon } from "lucide-react"
 
 interface StatCardProps {
   title: string
-  value: number
+  /** Numbers go through `format`; strings (ratios, modes) render as-is */
+  value: number | string
   format?: (n: number) => string
-  subtitle?: string
   icon: LucideIcon
+  /** Drawn behind the label and value, filling the tile (a sparkline) */
+  background?: React.ReactNode
 }
 
-export function StatCard({ title, value, format, subtitle, icon: Icon }: StatCardProps) {
+// Tiles sit flush against each other: the 1px gap shows the grid's border colour
+// through as a hairline between cells, whatever the column count.
+// The strip bleeds through <main>'s padding so it meets the header and sidebar lines.
+export function StatGrid({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <Card className="relative overflow-hidden card-hover">
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-widest text-muted-foreground/70">
-              {title}
-            </p>
-            <AnimatedValue
-              value={value}
-              format={format}
-              className="block text-2xl font-semibold tracking-tight font-mono tabular-nums"
-            />
-            {subtitle && (
-              <p className="text-[11px] text-muted-foreground">{subtitle}</p>
-            )}
-          </div>
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/8 text-primary ring-1 ring-primary/10">
-            <Icon className="h-4 w-4" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+    <div
+      className={cn(
+        "-mx-4 -mt-4 grid gap-px border-b bg-border sm:grid-cols-2 lg:-mx-6 lg:-mt-6 xl:grid-cols-4",
+        className
+      )}
+      {...props}
+    />
   )
 }
+
+export function StatCard({ title, value, format = formatNumber, icon: Icon, background }: StatCardProps) {
+  return (
+    // A single 48px row: icon and label on the left, value pushed right
+    <div className="relative flex h-12 items-center gap-2 overflow-hidden bg-card px-4 text-card-foreground">
+      {background && <div className="pointer-events-none absolute inset-0">{background}</div>}
+      <Icon className="relative h-3.5 w-3.5 shrink-0 text-muted-foreground/70" strokeWidth={1.5} />
+      <p className="relative truncate text-[11px] font-medium uppercase tracking-widest text-muted-foreground/70">
+        {title}
+      </p>
+      <span className="relative ml-auto shrink-0 text-lg font-semibold tracking-tight font-mono tabular-nums">
+        {typeof value === "number" ? format(value) : value}
+      </span>
+    </div>
+  )
+}
+
